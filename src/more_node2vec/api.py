@@ -19,8 +19,10 @@ import numpy as np
 import pandas as pd
 from gensim.models.keyedvectors import Vocab, Word2VecKeyedVectors
 from nodevectors import Node2Vec
+from nodevectors.embedders import BaseNodeEmbedder
 from sklearn.base import BaseEstimator
 from sklearn.decomposition import PCA
+from class_resolver import ClassResolver, HintType
 
 __all__ = [
     "echo",
@@ -337,8 +339,11 @@ def get_reducer_cls(model: Union[None, str, Type[BaseEstimator]], **kwargs):
     return Reducer, kwargs
 
 
-def fit_model(graph: nx.Graph, **kwargs) -> Model:
+resolver: ClassResolver[BaseNodeEmbedder] = ClassResolver.from_subclasses(BaseNodeEmbedder)
+
+def fit_model(graph: nx.Graph, model: HintType[BaseNodeEmbedder] = None, **kwargs) -> Model:
     """Fit a node2vec model on the graph and wrap it."""
+
     # if you're on gensim 4.0.0 +, they renamed the size
     default_params = dict(
         n_components=32,
@@ -360,12 +365,12 @@ def fit_model(graph: nx.Graph, **kwargs) -> Model:
     default_params.update(kwargs)
 
     echo("instantiating model")
-    node2vec = Node2Vec(**default_params)
+    model_cls = resolver.make(model, **default_params)
 
     echo("fitting model")
-    node2vec.fit(graph)
+    model.fit(graph)
 
-    return Model.from_node2vec(node2vec)
+    return Model.from_node2vec(model)
 
 
 def get_undirected_graph_from_df(df: pd.DataFrame) -> nx.Graph:
